@@ -117,7 +117,13 @@ pub fn read_line(prompt: &str) -> Result<String> {
     print!("{prompt}");
     io::stdout().flush()?;
     let mut s = String::new();
-    io::stdin().lock().read_line(&mut s)?;
+    if io::stdin().lock().read_line(&mut s)? == 0 {
+        println!();
+        // EOF: nobody is there to answer, so never take a default silently.
+        anyhow::bail!(
+            "stdin is closed and a question needs an answer (use --noconfirm for unattended runs)"
+        );
+    }
     Ok(s.trim().to_string())
 }
 

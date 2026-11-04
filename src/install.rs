@@ -425,10 +425,7 @@ pub fn install(client: &mut Client, targets: &[String], opts: &Opts) -> Result<i
     }
     if !plan.repo_deps.is_empty() {
         let list: Vec<&str> = plan.repo_deps.iter().map(String::as_str).collect();
-        msg(&format!(
-            "Repository dependencies (installed by makepkg): {}",
-            list.join(" ")
-        ));
+        msg(&format!("Repository dependencies: {}", list.join(" ")));
     }
     println!();
     if !util::ask("Proceed with the review?", true)? {
@@ -451,6 +448,18 @@ pub fn install(client: &mut Client, targets: &[String], opts: &Opts) -> Result<i
     }
 
     import_pgp_keys(&plan.order)?;
+
+    if !plan.repo_deps.is_empty() {
+        msg("Installing repository dependencies");
+        let mut args: Vec<String> = ["-S", "--asdeps", "--needed"].map(String::from).into();
+        if util::noconfirm() {
+            args.push("--noconfirm".into());
+        }
+        args.extend(plan.repo_deps.iter().cloned());
+        if pacman::run(&args, true)? != 0 {
+            bail!("pacman failed to install the repository dependencies");
+        }
+    }
 
     for base in &plan.order {
         build_and_install(base, &plan, &installed, opts)?;
