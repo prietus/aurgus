@@ -271,7 +271,10 @@ pub fn print_report(name: &str, r: &Report) {
 }
 
 fn show_files(dir: &Path, files: &[String]) -> Result<()> {
-    let pager = std::env::var("PAGER").unwrap_or_else(|_| "less".into());
+    let pager = std::env::var("PAGER")
+        .ok()
+        .or_else(|| crate::config::get().pager.clone())
+        .unwrap_or_else(|| "less".into());
     Command::new("sh")
         .arg("-c")
         .arg(format!("{pager} \"$@\""))

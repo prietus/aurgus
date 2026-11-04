@@ -48,7 +48,11 @@ pub fn state_dir() -> PathBuf {
 }
 
 pub fn clone_dir(base: &str) -> PathBuf {
-    cache_dir().join("clone").join(base)
+    crate::config::get()
+        .builddir
+        .clone()
+        .unwrap_or_else(|| cache_dir().join("clone"))
+        .join(base)
 }
 
 pub fn read_json<T: DeserializeOwned>(path: &Path) -> Option<T> {

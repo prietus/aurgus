@@ -6,7 +6,18 @@ use anyhow::{Result, bail};
 const OPS: &str = "DFQRSTUVGP";
 /// Long options handled by aurgus and never forwarded to pacman.
 const OWN_LONGS: &[&str] = &[
-    "aur", "repo", "noreview", "clean", "nocheck", "devel", "gendb",
+    "aur",
+    "repo",
+    "review",
+    "noreview",
+    "clean",
+    "noclean",
+    "check",
+    "nocheck",
+    "devel",
+    "nodevel",
+    "gendb",
+    "gen-config",
 ];
 /// pacman long options that take a separate value.
 const VALUE_LONGS: &[&str] = &[
@@ -55,6 +66,25 @@ impl Args {
 
     pub fn own(&self, name: &str) -> bool {
         self.own.iter().any(|o| o == name)
+    }
+
+    /// `--<name>` / `--no<name>` on the command line, else `default`
+    /// (normally the config file's value). The last one given wins.
+    pub fn flag(&self, name: &str, default: bool) -> bool {
+        let no = format!("no{name}");
+        self.own
+            .iter()
+            .rev()
+            .find_map(|o| {
+                if *o == name {
+                    Some(true)
+                } else if *o == no {
+                    Some(false)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(default)
     }
 
     /// `-<op><shorts>` plus forwarded long options, without targets.
@@ -155,5 +185,8 @@ mod tests {
         assert_eq!(p("-Syy").count('y'), 2);
         assert!(parse(&["-S".into(), "-R".into()]).is_err());
         assert_eq!(p("-Ss -- -weird").targets, ["-weird"]);
+        assert!(p("-Syu --devel").flag("devel", false));
+        assert!(!p("-Syu --devel --nodevel").flag("devel", true));
+        assert!(p("-Syu").flag("devel", true));
     }
 }

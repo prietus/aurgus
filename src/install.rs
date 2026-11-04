@@ -25,12 +25,13 @@ pub struct Opts {
 
 impl Opts {
     pub fn from_args(a: &Args) -> Self {
+        let c = crate::config::get();
         Opts {
             needed: a.has_long("needed"),
             asdeps: a.has_long("asdeps"),
-            nocheck: a.own("nocheck"),
-            review: !a.own("noreview"),
-            clean: a.own("clean"),
+            nocheck: !a.flag("check", !c.nocheck),
+            review: a.flag("review", c.review.unwrap_or(true)),
+            clean: a.flag("clean", c.clean),
         }
     }
 }

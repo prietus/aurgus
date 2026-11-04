@@ -12,7 +12,10 @@ pub fn is_root() -> bool {
 }
 
 fn sudo() -> String {
-    std::env::var("AURGUS_SUDO").unwrap_or_else(|_| "sudo".into())
+    std::env::var("AURGUS_SUDO")
+        .ok()
+        .or_else(|| crate::config::get().sudo.clone())
+        .unwrap_or_else(|| "sudo".into())
 }
 
 /// Runs pacman with inherited stdio; `root` prefixes sudo when needed.

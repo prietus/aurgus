@@ -8,7 +8,7 @@ use crate::review;
 use crate::rpc::{AUR_URL, AurPkg, Client, DAILY_SOFT_CAP};
 use crate::signals;
 use crate::util::{self, bold, clone_dir, cyan, dim, green, magenta, msg, red, yellow};
-use crate::{devel, meta, vercmp::vercmp};
+use crate::{config, devel, meta, vercmp::vercmp};
 use anyhow::{Result, bail};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -19,6 +19,10 @@ pub fn dispatch(mut args: Args) -> Result<i32> {
     match args.op {
         None if args.has('h') || args.has_long("help") => {
             help();
+            Ok(0)
+        }
+        None if args.own("gen-config") => {
+            print!("{}", config::EXAMPLE);
             Ok(0)
         }
         None if args.own("gendb") => gendb(),
@@ -186,7 +190,7 @@ fn sysupgrade(args: &Args) -> Result<i32> {
                 targets.push(name);
             }
         }
-        if args.own("devel") {
+        if args.flag("devel", config::get().devel) {
             msg("Checking upstream of -git packages...");
             for name in devel_updates(&mut client, &ignored(args))? {
                 if !targets.contains(&name) {
@@ -282,7 +286,7 @@ fn query(args: &Args) -> Result<i32> {
             }
         }
         any |= !updates.is_empty();
-        if args.has('a') && args.own("devel") {
+        if args.has('a') && args.flag("devel", config::get().devel) {
             let dev = devel_updates(&mut client, &ignored(args))?;
             for name in &dev {
                 if args.has('q') {
@@ -716,10 +720,17 @@ aurgus options:
                    audit findings are always shown and asked about)
   --clean          clean build (makepkg --cleanbuild)
   --nocheck        skip check() and checkdepends
+  --gen-config     print an example configuration file
+
+Configuration file: {config}
+  Create it with `aurgus --gen-config > file`. Flags on the command line
+  always win; negated forms (--nodevel, --review, --noclean, --check)
+  override values set in the file.
 
 Anything else is passed to pacman (with sudo when needed).
 Set AURGUS_SUDO to use doas/run0 instead of sudo.",
-        env!("CARGO_PKG_VERSION")
+        env!("CARGO_PKG_VERSION"),
+        config = config::path().display()
     );
 }
 
