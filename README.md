@@ -140,6 +140,17 @@ defaults. Unknown keys only produce a warning.
 
 ## Installation
 
+From the AUR, either the prebuilt binary (x86_64 and aarch64, no Rust
+toolchain needed) or the git version that builds from `master`:
+
+```
+aurgus -S aurgus-bin     # or: git clone https://aur.archlinux.org/aurgus-bin.git && makepkg -si
+aurgus -S aurgus-git
+```
+
+Release tarballs with checksums are published at
+<https://github.com/prietus/aurgus/releases>.
+
 From this repository:
 
 ```
