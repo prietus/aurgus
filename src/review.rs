@@ -18,6 +18,22 @@ pub struct Reviewed {
     pub commit: String,
     pub maintainer: Option<String>,
     pub at: u64,
+    /// AUR `LastModified` of the package base when aurgus last built it
+    /// successfully. While the AUR entry is unchanged, a version mismatch
+    /// (typical of -git packages with a stale static pkgver) is not an update.
+    #[serde(default)]
+    pub built_last_modified: Option<u64>,
+}
+
+/// Records that `base` was just built from the AUR entry last modified at
+/// `last_modified`.
+pub fn mark_built(base: &str, last_modified: u64) -> Result<()> {
+    let mut state = load();
+    if let Some(r) = state.get_mut(base) {
+        r.built_last_modified = Some(last_modified);
+        save(&state)?;
+    }
+    Ok(())
 }
 
 pub fn load() -> HashMap<String, Reviewed> {
@@ -357,6 +373,7 @@ pub fn review(base: &str, pkg: &AurPkg, interactive: bool) -> Result<bool> {
                 commit: report.head.clone(),
                 maintainer: pkg.maintainer.clone(),
                 at: util::now(),
+                built_last_modified: None,
             },
         );
         save(&state)?;

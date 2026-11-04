@@ -245,10 +245,21 @@ fn aur_updates(
     let foreign = pacman::foreign()?;
     let names: Vec<String> = foreign.iter().map(|(n, _)| n.clone()).collect();
     let info = client.info(&names)?;
+    let reviewed = review::load();
     let (mut updates, mut gone) = (Vec::new(), Vec::new());
     for (name, local) in foreign {
         match info.get(&name) {
             Some(p) if vercmp(&p.version, &local) == Ordering::Greater => {
+                // Built by aurgus from this very AUR revision: the version
+                // difference comes from pkgver() (e.g. a -git package whose
+                // static pkgver is stale), not from a real change.
+                let same_revision = reviewed
+                    .get(&p.package_base)
+                    .and_then(|r| r.built_last_modified)
+                    == Some(p.last_modified);
+                if same_revision {
+                    continue;
+                }
                 if pacman::is_ignored(&name, ignore) {
                     util::warn(&format!(
                         "{name}: ignoring package upgrade ({local} => {})",

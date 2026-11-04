@@ -465,6 +465,9 @@ pub fn install(client: &mut Client, targets: &[String], opts: &Opts) -> Result<i
     for base in &plan.order {
         build_and_install(base, &plan, &installed, opts)?;
         crate::devel::record(base)?;
+        if let Some(p) = plan.pkgs.values().find(|p| &p.package_base == base) {
+            review::mark_built(base, p.last_modified)?;
+        }
     }
     Ok(0)
 }
