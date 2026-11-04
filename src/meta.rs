@@ -184,6 +184,19 @@ fn parse_index(keep: impl Fn(&str, &str) -> bool) -> Result<Option<Vec<AurPkg>>>
     Ok(Some(out))
 }
 
+/// Names in the local index starting with `prefix` (for shell completion).
+pub fn names_with_prefix(prefix: &str) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(index_path()) else {
+        return Vec::new();
+    };
+    text.lines()
+        .skip(1)
+        .filter_map(|l| l.split('\t').next())
+        .filter(|n| n.starts_with(prefix))
+        .map(str::to_string)
+        .collect()
+}
+
 /// Packages whose name or description contain every (lowercase) term.
 /// Returns None when there is no local index. The index has no
 /// dependency information. Builds the compact index from the dump when

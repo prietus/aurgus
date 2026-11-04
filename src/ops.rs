@@ -635,8 +635,11 @@ fn audit_cmd(targets: &[String]) -> Result<i32> {
 }
 
 fn show(args: &Args) -> Result<i32> {
+    if args.has('c') {
+        return complete(args.targets.first().map(String::as_str).unwrap_or(""));
+    }
     if !args.has('s') {
-        bail!("usage: aurgus -Ps (statistics)");
+        bail!("usage: aurgus -Ps (statistics) or -Pc [prefix] (completion)");
     }
     let installed = pacman::installed()?;
     let foreign = pacman::foreign()?;
@@ -693,6 +696,24 @@ fn show(args: &Args) -> Result<i32> {
     Ok(0)
 }
 
+/// `-Pc [prefix]`: package names from the sync repos and the local AUR index,
+/// for shell completion. Never touches the network.
+fn complete(prefix: &str) -> Result<i32> {
+    let mut names: Vec<String> = pacman::sync_names()?
+        .into_iter()
+        .filter(|n| n.starts_with(prefix))
+        .collect();
+    names.extend(meta::names_with_prefix(prefix));
+    names.sort_unstable();
+    names.dedup();
+    let mut out = std::io::BufWriter::new(std::io::stdout().lock());
+    for n in names {
+        use std::io::Write;
+        writeln!(out, "{n}")?;
+    }
+    Ok(0)
+}
+
 fn help() {
     println!(
         "aurgus {} — AUR helper that audits PKGBUILDs before building them
@@ -710,6 +731,7 @@ AUR-aware operations:
   -Qu / -Qua       list updates / only AUR updates (--devel: -git packages too)
   -G <pkgs>        clone the AUR git repositories into the current directory
   -Ps              statistics about installed AUR packages
+  -Pc [prefix]     package names for shell completion (repos + local AUR index)
   audit <pkg|dir>  audit an AUR package or a local PKGBUILD without building
 
 aurgus options:

@@ -1,0 +1,113 @@
+#compdef aurgus
+# zsh completion for aurgus
+# install: /usr/share/zsh/site-functions/_aurgus
+
+_aurgus_packages() {
+    local -a names
+    # only once the prefix has a letter: the full list is ~130k names
+    [[ -z $PREFIX ]] && return 1
+    names=(${(f)"$(aurgus -Pc "$PREFIX" 2>/dev/null)"})
+    compadd -a names
+}
+
+_aurgus_installed() {
+    local -a names
+    names=(${(f)"$(pacman -Qq 2>/dev/null)"})
+    compadd -a names
+}
+
+_aurgus() {
+    local op="" w
+    for w in "${words[@]:1:$((CURRENT-2))}"; do
+        if [[ $w == -[A-Z]* ]]; then op="${w[2]}"; break; fi
+        case $w in
+            --sync) op=S ;; --query) op=Q ;; --remove) op=R ;;
+            --upgrade) op=U ;; --getpkgbuild) op=G ;; --show) op=P ;;
+        esac
+    done
+
+    local -a common=(
+        '--aur[only act on the AUR]' '--repo[only act on the repositories]'
+        '--review[ask to review every package]' '--noreview[do not ask to review clean packages]'
+        '--clean[clean build (makepkg --cleanbuild)]' '--noclean[reuse build directories]'
+        '--check[run check()]' '--nocheck[skip check() and checkdepends]'
+        '--devel[check upstream of -git packages]' '--nodevel[do not check -git packages]'
+        '--gendb[record upstream commits of installed -git packages]'
+        '--gen-config[print an example configuration file]'
+        '--noconfirm[do not ask for confirmation]' '--needed[do not reinstall up-to-date packages]'
+        '--asdeps[install as dependencies]' '--asexplicit[install as explicitly installed]'
+        '--ignore[ignore a package upgrade]:package:_aurgus_installed'
+        '--ignoregroup[ignore a group upgrade]:group:'
+        '--config[alternate pacman.conf]:file:_files'
+        '--root[alternate installation root]:dir:_files -/'
+        '--dbpath[alternate database location]:dir:_files -/'
+        '--cachedir[alternate package cache]:dir:_files -/'
+        '--color[colorize output]:when:(always never auto)'
+        '--verbose[be verbose]' '--quiet[show less information]'
+    )
+
+    case $op in
+        S)
+            _arguments -s "${common[@]}" \
+                '(-s --search)'{-s,--search}'[search repos and AUR]' \
+                '(-i --info)'{-i,--info}'[package information]' \
+                '(-y --refresh)'{-y,--refresh}'[refresh databases and the AUR index]' \
+                '(-u --sysupgrade)'{-u,--sysupgrade}'[upgrade all packages, AUR included]' \
+                '(-c --clean)'{-c,--clean}'[clean caches and build directories]' \
+                '(-l --list)'{-l,--list}'[list repository packages]' \
+                '(-g --groups)'{-g,--groups}'[list package groups]' \
+                '(-p --print)'{-p,--print}'[print targets instead of acting]' \
+                '(-w --downloadonly)'{-w,--downloadonly}'[download only]' \
+                '*:package:_aurgus_packages' ;;
+        Q)
+            _arguments -s "${common[@]}" \
+                '(-u --upgrades)'{-u,--upgrades}'[list available upgrades]' \
+                '(-a)-a[AUR packages only (with -u)]' \
+                '(-m --foreign)'{-m,--foreign}'[list foreign packages]' \
+                '(-n --native)'{-n,--native}'[list native packages]' \
+                '(-e --explicit)'{-e,--explicit}'[explicitly installed]' \
+                '(-d --deps)'{-d,--deps}'[installed as dependencies]' \
+                '(-t --unrequired)'{-t,--unrequired}'[not required by any package]' \
+                '(-i --info)'{-i,--info}'[package information]' \
+                '(-l --list)'{-l,--list}'[list package files]' \
+                '(-s --search)'{-s,--search}'[search installed packages]' \
+                '(-o --owns)'{-o,--owns}'[query the package owning a file]:file:_files' \
+                '(-q --quiet)'{-q,--quiet}'[show less information]' \
+                '*:package:_aurgus_installed' ;;
+        R)
+            _arguments -s "${common[@]}" \
+                '(-s --recursive)'{-s,--recursive}'[remove unneeded dependencies]' \
+                '(-n --nosave)'{-n,--nosave}'[remove configuration files]' \
+                '(-c --cascade)'{-c,--cascade}'[remove packages that depend on the targets]' \
+                '(-u --unneeded)'{-u,--unneeded}'[remove only unneeded packages]' \
+                '*:package:_aurgus_installed' ;;
+        U)
+            _arguments -s "${common[@]}" '*:package file:_files -g "*.pkg.tar.*"' ;;
+        G)
+            _arguments -s '*:AUR package:_aurgus_packages' ;;
+        P)
+            _arguments -s '(-s)-s[statistics about installed AUR packages]' \
+                '(-c)-c[package names for completion]' ;;
+        *)
+            _arguments -s "${common[@]}" \
+                '(- *)-h[show help]' \
+                '-S[sync: install packages from the repos and the AUR]' \
+                '-Ss[search repos and AUR]' '-Si[package information]' \
+                '-Syu[upgrade the system, AUR included]' '-Sc[clean caches]' \
+                '-Q[query installed packages]' '-Qu[list upgrades]' '-Qua[list AUR upgrades]' \
+                '-R[remove packages]' '-Rns[remove packages with dependencies and configs]' \
+                '-U[install package files]' '-G[clone AUR repositories]' \
+                '-Ps[AUR statistics]' '-F[files database]' '-D[database]' \
+                '-T[deptest]' '-V[version]' \
+                '1:command or search term:->first' \
+                '*:search term or package:_aurgus_packages'
+            case $state in
+                first)
+                    _alternative \
+                        'commands:command:((audit\:"audit a package or PKGBUILD directory"))' \
+                        'packages:package:_aurgus_packages' ;;
+            esac ;;
+    esac
+}
+
+_aurgus "$@"

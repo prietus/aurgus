@@ -66,8 +66,48 @@ pub fn explicit_count() -> Result<usize> {
     Ok(capture(&["-Qeq"])?.1.lines().count())
 }
 
+/// Names of every package in the sync repositories. `pacman -Slq` takes
+/// ~0.5 s, so the list is cached and keyed on the sync databases' mtimes.
 pub fn sync_names() -> Result<HashSet<String>> {
-    Ok(capture(&["-Slq"])?.1.lines().map(str::to_string).collect())
+    let dbpath = Command::new("pacman-conf")
+        .arg("DBPath")
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "/var/lib/pacman/".into());
+    let mut stamp = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(std::path::Path::new(&dbpath).join("sync")) {
+        for e in rd.flatten() {
+            if e.path().extension().is_some_and(|x| x == "db") {
+                if let Ok(m) = e.metadata() {
+                    stamp.push(format!(
+                        "{}:{}:{}",
+                        e.file_name().to_string_lossy(),
+                        m.mtime(),
+                        m.len()
+                    ));
+                }
+            }
+        }
+    }
+    stamp.sort();
+    let stamp = stamp.join(" ");
+    let cache = crate::util::cache_dir().join("sync-names.txt");
+    if let Ok(text) = std::fs::read_to_string(&cache) {
+        let mut lines = text.lines();
+        if lines.next() == Some(stamp.as_str()) {
+            return Ok(lines.map(str::to_string).collect());
+        }
+    }
+    let out = capture(&["-Slq"])?.1;
+    let names: HashSet<String> = out.lines().map(str::to_string).collect();
+    if let Some(dir) = cache.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&cache, format!("{stamp}\n{out}"));
+    Ok(names)
 }
 
 pub fn group_names() -> Result<HashSet<String>> {
