@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo --version)",
+      "Bash(rustc --version)",
+      "Bash(pacman -Q pacman)",
+      "Read(//home/teraflops/.cargo/**)",
+      "Bash(pacman -Q pacman git base-devel bubblewrap rustup rust)",
+      "Read(//home/teraflops/**)"
+    ]
+  }
+}
