@@ -238,10 +238,10 @@ fn gendb() -> Result<i32> {
 
 /// (name, installed, available) for foreign packages with a newer AUR
 /// version, plus the foreign packages that are not in the AUR at all.
-fn aur_updates(
-    client: &mut Client,
-    ignore: &[String],
-) -> Result<(Vec<(String, String, String)>, Vec<String>)> {
+/// (name, installed version, AUR version)
+type Update = (String, String, String);
+
+fn aur_updates(client: &mut Client, ignore: &[String]) -> Result<(Vec<Update>, Vec<String>)> {
     let foreign = pacman::foreign()?;
     let names: Vec<String> = foreign.iter().map(|(n, _)| n.clone()).collect();
     let info = client.info(&names)?;
@@ -483,7 +483,7 @@ fn print_aur_info(p: &AurPkg) {
 fn interactive(args: &Args) -> Result<i32> {
     enum Hit {
         Repo(pacman::RepoHit),
-        Aur(AurPkg),
+        Aur(Box<AurPkg>),
     }
     let installed = pacman::installed()?;
     let mut client = Client::new();
@@ -495,7 +495,7 @@ fn interactive(args: &Args) -> Result<i32> {
         hits.extend(
             aur_search(&mut client, &args.targets)?
                 .into_iter()
-                .map(Hit::Aur),
+                .map(|p| Hit::Aur(Box::new(p))),
         );
     }
     if hits.is_empty() {

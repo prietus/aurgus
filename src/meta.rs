@@ -150,7 +150,7 @@ fn build_index() -> Result<()> {
 }
 
 /// Parses the index, keeping only entries accepted by `keep(name, description)`.
-fn parse_index(keep: impl Fn(&str, &str) -> bool) -> Result<Option<Vec<AurPkg>>> {
+fn parse_index(keep: impl Fn(&str, &str) -> bool + Copy) -> Result<Option<Vec<AurPkg>>> {
     let Ok(text) = std::fs::read_to_string(index_path()) else {
         return Ok(None);
     };
@@ -207,14 +207,14 @@ pub fn search(terms_lower: &[String]) -> Result<Option<Vec<AurPkg>>> {
             .iter()
             .all(|t| contains_ci(name, t) || contains_ci(desc, t))
     };
-    if let Some(v) = parse_index(&keep)? {
+    if let Some(v) = parse_index(keep)? {
         return Ok(Some(v));
     }
     if !dump_path().exists() {
         return Ok(None);
     }
     build_index()?;
-    parse_index(&keep)
+    parse_index(keep)
 }
 
 #[cfg(test)]

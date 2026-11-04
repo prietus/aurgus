@@ -80,15 +80,15 @@ pub fn sync_names() -> Result<HashSet<String>> {
     let mut stamp = Vec::new();
     if let Ok(rd) = std::fs::read_dir(std::path::Path::new(&dbpath).join("sync")) {
         for e in rd.flatten() {
-            if e.path().extension().is_some_and(|x| x == "db") {
-                if let Ok(m) = e.metadata() {
-                    stamp.push(format!(
-                        "{}:{}:{}",
-                        e.file_name().to_string_lossy(),
-                        m.mtime(),
-                        m.len()
-                    ));
-                }
+            if e.path().extension().is_some_and(|x| x == "db")
+                && let Ok(m) = e.metadata()
+            {
+                stamp.push(format!(
+                    "{}:{}:{}",
+                    e.file_name().to_string_lossy(),
+                    m.mtime(),
+                    m.len()
+                ));
             }
         }
     }

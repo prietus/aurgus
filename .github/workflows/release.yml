@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --release --locked
+      - run: cargo build --release --locked
+      - name: Package
+        run: |
+          set -eu
+          v="${GITHUB_REF_NAME#v}"
+          dir="aurgus-$v-${{ matrix.arch }}-linux"
+          mkdir -p "$dir/completions"
+          cp target/release/aurgus "$dir/"
+          cp completions/aurgus.bash completions/_aurgus completions/aurgus.fish "$dir/completions/"
+          cp README.md LICENSE "$dir/"
+          tar czf "$dir.tar.gz" "$dir"
+          sha256sum "$dir.tar.gz" > "$dir.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}
+          path: |
+            aurgus-*.tar.gz
+            aurgus-*.tar.gz.sha256
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          cd dist
+          cat *.sha256 > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "aurgus $GITHUB_REF_NAME" \
+            --generate-notes \
+            aurgus-*.tar.gz SHA256SUMS

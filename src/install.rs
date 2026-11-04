@@ -50,7 +50,7 @@ fn provided_by<'a>(pkgs: &'a BTreeMap<String, AurPkg>, name: &str) -> Option<&'a
 /// providing it (one RPC search, cached) and pick the most voted one.
 fn find_provider(client: &mut Client, name: &str) -> Result<Option<AurPkg>> {
     let mut hits = client.search(name, "provides")?;
-    hits.sort_by(|a, b| b.num_votes.cmp(&a.num_votes));
+    hits.sort_by_key(|p| std::cmp::Reverse(p.num_votes));
     let Some(best) = hits.into_iter().next() else {
         return Ok(None);
     };
