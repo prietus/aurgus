@@ -5,7 +5,9 @@ use anyhow::{Result, bail};
 /// Operations: pacman's plus G (getpkgbuild) and P (show/stats).
 const OPS: &str = "DFQRSTUVGP";
 /// Long options handled by aurgus and never forwarded to pacman.
-const OWN_LONGS: &[&str] = &["aur", "repo", "noreview", "clean", "nocheck"];
+const OWN_LONGS: &[&str] = &[
+    "aur", "repo", "noreview", "clean", "nocheck", "devel", "gendb",
+];
 /// pacman long options that take a separate value.
 const VALUE_LONGS: &[&str] = &[
     "config",

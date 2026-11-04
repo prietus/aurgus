@@ -463,6 +463,7 @@ pub fn install(client: &mut Client, targets: &[String], opts: &Opts) -> Result<i
 
     for base in &plan.order {
         build_and_install(base, &plan, &installed, opts)?;
+        crate::devel::record(base)?;
     }
     Ok(0)
 }

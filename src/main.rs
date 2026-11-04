@@ -1,5 +1,6 @@
 mod args;
 mod audit;
+mod devel;
 mod install;
 mod meta;
 mod ops;

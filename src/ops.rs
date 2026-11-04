@@ -8,7 +8,7 @@ use crate::review;
 use crate::rpc::{AUR_URL, AurPkg, Client, DAILY_SOFT_CAP};
 use crate::signals;
 use crate::util::{self, bold, clone_dir, cyan, dim, green, magenta, msg, red, yellow};
-use crate::{meta, vercmp::vercmp};
+use crate::{devel, meta, vercmp::vercmp};
 use anyhow::{Result, bail};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -21,6 +21,7 @@ pub fn dispatch(mut args: Args) -> Result<i32> {
             help();
             Ok(0)
         }
+        None if args.own("gendb") => gendb(),
         None if args.targets.is_empty() => {
             // Bare `aurgus` = `aurgus -Syu`, like yay/paru.
             args.op = Some('S');
@@ -180,8 +181,50 @@ fn sysupgrade(args: &Args) -> Result<i32> {
                 targets.push(name);
             }
         }
+        if args.own("devel") {
+            msg("Checking upstream of -git packages...");
+            for name in devel_updates(&mut client, &ignored(args))? {
+                if !targets.contains(&name) {
+                    targets.push(name);
+                }
+            }
+        }
     }
     install::install(&mut client, &targets, &Opts::from_args(args))
+}
+
+/// Installed `-git` packages with new upstream commits (names).
+fn devel_updates(client: &mut Client, ignore: &[String]) -> Result<Vec<String>> {
+    let foreign: HashMap<String, String> = pacman::foreign()?
+        .into_iter()
+        .filter(|(n, _)| devel::is_vcs(n) && !ignore.contains(n))
+        .collect();
+    let names: Vec<String> = foreign.keys().cloned().collect();
+    let bases: HashMap<String, String> = client
+        .info(&names)?
+        .into_iter()
+        .map(|(n, p)| (n, p.package_base))
+        .collect();
+    devel::updates(&foreign, &bases)
+}
+
+fn gendb() -> Result<i32> {
+    let foreign: HashMap<String, String> = pacman::foreign()?
+        .into_iter()
+        .filter(|(n, _)| devel::is_vcs(n))
+        .collect();
+    let names: Vec<String> = foreign.keys().cloned().collect();
+    let mut client = Client::new();
+    let bases: HashMap<String, String> = client
+        .info(&names)?
+        .into_iter()
+        .map(|(n, p)| (n, p.package_base))
+        .collect();
+    let n = devel::gendb(&foreign, &bases)?;
+    msg(&format!(
+        "Recorded upstream commits of {n} -git package base(s)"
+    ));
+    Ok(0)
 }
 
 /// (name, installed, available) for foreign packages with a newer AUR
@@ -234,6 +277,17 @@ fn query(args: &Args) -> Result<i32> {
             }
         }
         any |= !updates.is_empty();
+        if args.has('a') && args.own("devel") {
+            let dev = devel_updates(&mut client, &ignored(args))?;
+            for name in &dev {
+                if args.has('q') {
+                    println!("{name}");
+                } else {
+                    println!("{} {}", bold(name), dim("(new upstream commits)"));
+                }
+            }
+            any |= !dev.is_empty();
+        }
     }
     Ok(if any { 0 } else { 1 })
 }
@@ -248,11 +302,11 @@ fn aur_search(client: &mut Client, terms: &[String]) -> Result<Vec<AurPkg>> {
         lower.iter().all(|t| name.contains(t) || desc.contains(t))
     };
     let local = match meta::age() {
-        Some(age) if age < meta::MAX_AGE_FOR_SEARCH => meta::load()?,
+        Some(age) if age < meta::MAX_AGE_FOR_SEARCH => meta::search(&lower)?,
         _ => None,
     };
     let mut res: Vec<AurPkg> = match local {
-        Some(all) => all.into_iter().filter(|p| matches(p)).collect(),
+        Some(hits) => hits,
         None => {
             let longest = terms.iter().max_by_key(|t| t.len()).unwrap();
             client
@@ -644,13 +698,15 @@ AUR-aware operations:
   -Si <pkgs>       package info, with review hints (new, few votes, orphan)
   -Sy / -Syu       refresh (also the local AUR index) / upgrade, AUR included
   -Sc              clean pacman's cache and aurgus build directories
-  -Qu / -Qua       list updates / only AUR updates
+  -Qu / -Qua       list updates / only AUR updates (--devel: -git packages too)
   -G <pkgs>        clone the AUR git repositories into the current directory
   -Ps              statistics about installed AUR packages
   audit <pkg|dir>  audit an AUR package or a local PKGBUILD without building
 
 aurgus options:
   --aur / --repo   only act on the AUR / the repositories
+  --devel          with -Syu/-Qua: check upstream of -git packages (git ls-remote)
+  --gendb          record the current upstream commits of installed -git packages
   --noreview       don't ask to review clean packages (high-severity
                    audit findings are always shown and asked about)
   --clean          clean build (makepkg --cleanbuild)
