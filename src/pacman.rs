@@ -124,3 +124,57 @@ pub fn search(terms: &[String]) -> Result<Vec<RepoHit>> {
     }
     Ok(hits)
 }
+
+/// `IgnorePkg` entries from pacman.conf (Include directives expanded by
+/// pacman-conf). `config` is an alternative --config path.
+pub fn conf_ignorepkg(config: Option<&str>) -> Vec<String> {
+    let mut cmd = Command::new("pacman-conf");
+    if let Some(c) = config {
+        cmd.arg("--config").arg(c);
+    }
+    cmd.arg("IgnorePkg")
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(str::to_string)
+                .filter(|l| !l.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Whether `name` matches any pattern (pacman allows shell globs in IgnorePkg).
+pub fn is_ignored(name: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|p| {
+        if p == name {
+            return true;
+        }
+        if !p.contains(['*', '?', '[']) {
+            return false;
+        }
+        match (
+            std::ffi::CString::new(p.as_str()),
+            std::ffi::CString::new(name),
+        ) {
+            // SAFETY: both are valid NUL-terminated C strings for the call's duration.
+            (Ok(p), Ok(n)) => unsafe { libc::fnmatch(p.as_ptr(), n.as_ptr(), 0) == 0 },
+            _ => false,
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ignore_globs() {
+        let pats = ["linux", "python-*", "foo?bar"].map(String::from);
+        assert!(super::is_ignored("linux", &pats));
+        assert!(super::is_ignored("python-requests", &pats));
+        assert!(super::is_ignored("foo-bar", &pats));
+        assert!(!super::is_ignored("linux-lts", &pats));
+        assert!(!super::is_ignored("python", &pats));
+    }
+}

@@ -53,12 +53,17 @@ fn passthrough(args: &Args, root: bool) -> Result<i32> {
     pacman::run(&v, root)
 }
 
+/// Packages to skip on upgrade: `--ignore` plus pacman.conf's IgnorePkg.
 fn ignored(args: &Args) -> Vec<String> {
-    args.longs
+    let config = args.longs.iter().find_map(|l| l.strip_prefix("--config="));
+    let mut v: Vec<String> = args
+        .longs
         .iter()
         .filter_map(|l| l.strip_prefix("--ignore="))
         .flat_map(|v| v.split(',').map(str::to_string))
-        .collect()
+        .collect();
+    v.extend(pacman::conf_ignorepkg(config));
+    v
 }
 
 /// Splits targets into (repository, AUR). `aur/foo` and `core/foo` prefixes
@@ -197,7 +202,7 @@ fn sysupgrade(args: &Args) -> Result<i32> {
 fn devel_updates(client: &mut Client, ignore: &[String]) -> Result<Vec<String>> {
     let foreign: HashMap<String, String> = pacman::foreign()?
         .into_iter()
-        .filter(|(n, _)| devel::is_vcs(n) && !ignore.contains(n))
+        .filter(|(n, _)| devel::is_vcs(n) && !pacman::is_ignored(n, ignore))
         .collect();
     let names: Vec<String> = foreign.keys().cloned().collect();
     let bases: HashMap<String, String> = client
@@ -240,7 +245,7 @@ fn aur_updates(
     for (name, local) in foreign {
         match info.get(&name) {
             Some(p) if vercmp(&p.version, &local) == Ordering::Greater => {
-                if ignore.contains(&name) {
+                if pacman::is_ignored(&name, ignore) {
                     util::warn(&format!(
                         "{name}: ignoring package upgrade ({local} => {})",
                         p.version
